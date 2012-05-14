@@ -1,4 +1,4 @@
-sicp
+SICP
 ====
 
-SICP exercises in clojure
+SICP exercises in Clojure (work in progress).
