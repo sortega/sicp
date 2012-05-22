@@ -69,8 +69,8 @@
 ;; ================
 
 (defn fib [n]
-  (loop [a 1 
-         b 0
+  (loop [a 1N
+         b 0N
          n n]
     (if (zero? n)
       b
@@ -210,7 +210,7 @@
 ;; =============
 
 (defn dbl [x] (* x 2))
-(defn hlv [x] (/ x 2))
+(defn hlv [x] (quot x 2))
 
 (defn fast* [a b]
   (cond (zero? b) 0
@@ -237,6 +237,188 @@
 ; T^n(0, 1) = (Fib(n+1), Fib(n))
 ;
 ; T = T_0,1
-; T_pq (a, b) = (bq + aq + ap, bp + aq)
+; T_pq (a, b) = (bq + aq + ap, 
+;                bp + aq)
 ; T_pq^2(a, b) = ((bp + aq)q + (bq + aq + ap)q + (bq + aq + ap)p,
 ;                 (bp + aq)p + (bq + aq + ap)q)
+;              = (b(2pq+qq) + a(2pq+qq) + a(pp+qq),
+;                 b(pp+qq)  + a(2pq+qq))
+;              = T_(p^2+q^2),(2pq+q^2)             
+; (T_01 o T_pq)(a b) = T_pq(a+b, a)
+;                    = (aq + (a+b)q + (a+b)p, 
+;                       ap + (a+b)q)
+;                    = (b(p+q) + a(p+q) + aq,
+;                       bq + a(p+q))
+;                    = T_q,p+q(a, b)
+
+(defn fast-fib [n]
+  (loop [a 1N, b 0N, p 0N, q 1N, count n]
+    (cond (zero? count) b
+          (even? count) (recur a b
+                               (+ (square p) (square q))
+                               (+ (* 2 p q)  (square q)) 
+                               (hlv count))
+          :else         (recur (+ (* b q) (* a q) (* a p))
+                               (+ (* b p) (* a q))
+                               p q (dec count)))))
+
+
+;; Exercise 1.20
+;; =============
+
+(defn gcd [a b]
+  (if (zero? b)
+    a
+    (recur b (mod a b))))
+
+; Applicative order evaluation:
+;
+; (gcd 206 40)
+; (gcd 40 (mod 206 40)
+; (gcd 40 6)
+; (gcd 6 (mod 40 6))
+; (gcd 6 4)
+; (gcd 4 (mod 6 4))
+; (gcd 4 2)
+; (gcd 2 (mod 4 2))
+; (gcd 2 0)
+; 2
+;
+; Normal order evaluation:
+;
+; (gcd 206 40)
+; (if (zero? 40) 206 (gcd 40 (mod 206 40)))
+; (gcd 40 (mod 206 40))
+; (if (zero? (mod 206 40)) 40 (gcd (mod 206 40) (mod 40 (mod 206 40))))
+; (if (zero? 6) 40 (gcd (mod 206 40) (mod 40 (mod 206 40))))
+; (gcd (mod 206 40) (mod 40 (mod 206 40)))
+; (if (zero? (mod 40 (mod 206 40))) (mod 206 40) (gcd (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))
+; (if (zero? (mod 40 6)) (mod 206 40) (gcd (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))
+; (if (zero? 4) (mod 206 40) (gcd (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))
+; (gcd (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))
+; (if (zero? (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod 40 (mod 206 40)) (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))))
+; (if (zero? (mod 6 (mod 40 (mod 206 40)))) (mod 40 (mod 206 40)) (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))))
+; (if (zero? (mod 6 (mod 40 6))) (mod 40 (mod 206 40)) (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))))
+; (if (zero? (mod 6 4)) (mod 40 (mod 206 40)) (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))))
+; (if (zero? 2) (mod 40 (mod 206 40)) (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))))
+; (gcd (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))
+; (if (zero? (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40))))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod (mod 40 6) (mod (mod 206 40) (mod 40 (mod 206 40))))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod 4 (mod (mod 206 40) (mod 40 (mod 206 40))))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod 4 (mod 6 (mod 40 (mod 206 40))))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod 4 (mod 6 (mod 40 6)))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod 4 (mod 6 4))) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? (mod 4 2)) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (if (zero? 0) (mod (mod 206 40) (mod 40 (mod 206 40))) (gcd (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))) (mod (mod (mod 206 40) (mod 40 (mod 206 40))) (mod (mod 40 (mod 206 40)) (mod (mod 206 40) (mod 40 (mod 206 40)))))))
+; (mod (mod 206 40) (mod 40 (mod 206 40)))
+; (mod 6 (mod 40 (mod 206 40)))
+; (mod 6 (mod 40 6))
+; (mod 6 4)
+; 2
+;
+; Normal evaluation: 18 mod's
+; Applicative evaluation: 4 mod's
+
+
+;; Primality
+;; =========
+
+(defn divides? [a b] (zero? (mod b a)))
+
+(defn smallest-divisor [n]
+  (loop [divisor 2]
+    (cond (> (square divisor) n) n
+          (divides? divisor n)   divisor
+          :else                  (recur (inc divisor)))))
+
+(defn prime? [n]
+  (= n (smallest-divisor n)))
+
+(defn expmod [base exp m]
+  (cond (zero? exp) 1
+        (even? exp) (mod (square (expmod base (hlv exp) m)) m)
+        :else       (mod (* base (expmod base (dec exp) m)) m)))
+
+(defn fermat-test [n]
+  (let [r (inc (rand-int (dec n)))]
+    (= (expmod r n n) r)))
+
+(defn fast-prime? [n times]
+  (cond (zero? times)   true
+        (fermat-test n) (recur n (dec times))
+        :else           false))
+
+
+;; Exercise 1.21
+;; =============
+
+(map smallest-divisor [199 1999 19999])
+; (199 1999 7)
+
+
+;; Exercise 1.22
+;; =============
+
+(defn runtime [] (System/currentTimeMillis))
+
+(defn timed-prime? [n]
+  (let [start (runtime)
+        prime (prime? n)]
+    [prime n (- (runtime) start)]))
+
+(defn search-for-primes [a b]
+  (->> (range a (inc b) 2)
+    (map timed-prime?)
+    (filter first)
+    (map rest)))
+
+(take 3 (search-for-primes 1001 2001))
+; ((1009 0) (1013 0) (1019 0))
+
+(take 3 (search-for-primes 10001 20001))
+; ((10007 0) (10009 0) (10037 0))
+
+(take 3 (search-for-primes 100001 200001))
+; ((100003 0) (100019 1) (100043 0))
+
+(take 3 (search-for-primes 10000001 20000001))
+; ((10000019 1) (10000079 1) (10000103 1))
+
+(take 3 (search-for-primes 10000000001 20000000001))
+; ((10000000019 9) (10000000033 12) (10000000061 9))
+
+; It doesn't fit very well on the O(sqrt(n)) model but it's understantable 
+; since my machine is way more powerful than the average 80's computer and 
+; this examples are very small.
+
+
+;; Exercise 1.23
+;; =============
+
+(defn nexto [n]
+  (if (= n 2)
+    3
+    (+ 2 n)))
+
+(defn smallest-divisor [n]
+  (loop [divisor 2]
+    (cond (> (square divisor) n) n
+          (divides? divisor n)   divisor
+          :else                  (recur (nexto divisor)))))
+
+(take 3 (search-for-primes 1001 2001))
+; ((1009 0) (1013 0) (1019 0))
+
+(take 3 (search-for-primes 10001 20001))
+; ((10007 0) (10009 0) (10037 0))
+
+(take 3 (search-for-primes 100001 200001))
+; ((100003 1) (100019 0) (100043 0))
+
+(take 3 (search-for-primes 10000001 20000001))
+; ((10000019 4) (10000079 3) (10000103 2))
+
+(take 3 (search-for-primes 10000000001 20000000001))
+; ((10000000019 12) (10000000033 6) (10000000061 6))
+
+; I think the effect is below measurement so I cannot compare.
