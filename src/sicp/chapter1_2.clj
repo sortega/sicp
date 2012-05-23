@@ -339,14 +339,30 @@
         (even? exp) (mod (square (expmod base (hlv exp) m)) m)
         :else       (mod (* base (expmod base (dec exp) m)) m)))
 
+(defn log2 [n]
+  (/ (Math/log n)
+     (Math/log 2)))
+
+(defn rand-bigint [n]
+  (let [bits (inc (int (Math/round (log2 n))))
+        rnd  (java.util.Random.)]
+    (loop []
+      (let [r (BigInteger. bits rnd)]
+        (if (< r n)
+          r
+          (recur))))))
+
 (defn fermat-test [n]
-  (let [r (inc (rand-int (dec n)))]
+  (let [r (inc (rand-bigint (dec n)))]
     (= (expmod r n n) r)))
 
-(defn fast-prime? [n times]
-  (cond (zero? times)   true
-        (fermat-test n) (recur n (dec times))
-        :else           false))
+(defn test-times [test-fn]
+  (fn [n times]
+    (every? identity
+            (for [_ (range times)] (test-fn n)))))
+
+(def fast-prime?
+  (test-times fermat-test))
 
 
 ;; Exercise 1.21
@@ -374,16 +390,12 @@
 
 (take 3 (search-for-primes 1001 2001))
 ; ((1009 0) (1013 0) (1019 0))
-
 (take 3 (search-for-primes 10001 20001))
 ; ((10007 0) (10009 0) (10037 0))
-
 (take 3 (search-for-primes 100001 200001))
 ; ((100003 0) (100019 1) (100043 0))
-
 (take 3 (search-for-primes 10000001 20000001))
 ; ((10000019 1) (10000079 1) (10000103 1))
-
 (take 3 (search-for-primes 10000000001 20000000001))
 ; ((10000000019 9) (10000000033 12) (10000000061 9))
 
@@ -408,17 +420,98 @@
 
 (take 3 (search-for-primes 1001 2001))
 ; ((1009 0) (1013 0) (1019 0))
-
 (take 3 (search-for-primes 10001 20001))
 ; ((10007 0) (10009 0) (10037 0))
-
 (take 3 (search-for-primes 100001 200001))
 ; ((100003 1) (100019 0) (100043 0))
-
 (take 3 (search-for-primes 10000001 20000001))
 ; ((10000019 4) (10000079 3) (10000103 2))
-
 (take 3 (search-for-primes 10000000001 20000000001))
 ; ((10000000019 12) (10000000033 6) (10000000061 6))
 
 ; I think the effect is below measurement so I cannot compare.
+
+
+;; Exercise 1.24
+;; =============
+
+(defn timed-prime? [n]
+  (let [start (runtime)
+        prime (fast-prime? n 100)]
+    [prime n (- (runtime) start)]))
+
+; user=> (take 3 (search-for-primes 1001 2001))
+; ((1009 2) (1013 2) (1019 2))
+; user=> (take 3 (search-for-primes 10001 20001))
+; ((10007 2) (10009 3) (10037 4))
+; user=> (take 3 (search-for-primes 100001 200001))
+; ((100003 2) (100019 3) (100043 2))
+; user=> (take 3 (search-for-primes 10000001 20000001))
+; ((10000019 2) (10000079 3) (10000103 2))
+; user=> (take 3 (search-for-primes 10000000001 20000000001))
+; ((10000000019 4) (10000000033 3) (10000000061 3))
+;
+; Computation time *does* grows more slowy!
+
+
+;; Exercise 1.25
+;; =============
+
+(defn expmod2 [base exp m]
+  (mod (fast-exp base exp) m))
+
+; It works if you use multiple precision numbers as base but that's 
+; slower than plain old numbers. (About 10 times slower).
+
+
+;; Exercise 1.26
+;; =============
+
+; Reasoner has a tree-recursive expmod implementation since every
+; non-base case makes two recursive calls.  Using the master method 
+; to estimate complexity (http://en.wikipedia.org/wiki/Master_theorem):
+;
+; T(n) <= 2T(n/2) + O(1)
+;
+; So it is O(n^log_2(2)) = O(n)
+
+;; Exercise 1.27
+;; =============
+
+(def carmichaels [561 1105 1729 2465 2821 6601])
+
+(defn carmichaelic? [n]
+  (every? #(= (expmod % n n) %)
+          (range 1 n)))
+
+; user=> (remove prime? (filter carmichaelic? (range 7000)))
+; (561 1105 1729 2465 2821 6601)
+
+
+;; Exercise 1.28
+;; =============
+
+(defn abs [n]
+  (if (neg? n) (- n) n))
+
+(defn expmod0
+  "Returns 0 when non-trivial square roots of 1 are found"
+  [base exp m]
+  (cond (zero? exp) 1
+        (even? exp) (let [root (expmod0 base (hlv exp) m)
+                          res  (mod (square root) m)]
+                      (if (and (= res 1)
+                               (not= (abs root) 1))
+                        0
+                        res))
+        :else       (mod (* base (expmod0 base (dec exp) m)) m)))
+
+(defn miller-rabin-test [n]
+  (let [r (inc (rand-bigint (dec n)))]
+    (= (expmod0 r n n) r)))
+
+(def miller-rabin-prime?
+  (test-times miller-rabin-test))
+
+; user=> (map miller-rabin-prime? carmichaels (repeat 100))
+; (false false false false false false)
