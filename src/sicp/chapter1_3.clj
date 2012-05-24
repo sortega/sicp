@@ -1,4 +1,5 @@
 (ns sicp.chapter1-3
+  (:use [sicp.chapter1-1 :only [average]])
   (:use [sicp.chapter1-2 :only [gcd square prime?]]))
 
 ;; Exercise 1.29
@@ -111,3 +112,127 @@
     #(= 1 (gcd n %))
     identity
     1 inc (dec n)))
+
+
+;; Exercise 1.34
+;; =============
+
+(defn f [g] (g 2))
+
+; Signals error since 2 is not callable
+;
+; (f f)
+; (f 2)
+; (2 2) => error!
+
+
+;; Half-interval method
+;; ====================
+
+(declare close-enough?)
+
+(defn search [f neg-point pos-point]
+  (let [midpoint (average neg-point pos-point)]
+    (if (close-enough? neg-point pos-point)
+      midpoint
+      (let [test-value (f midpoint)]
+        (cond (pos? test-value) (search f neg-point midpoint)
+              (neg? test-value) (search f midpoint pos-point)
+              :else             midpoint)))))
+
+(defn diff [x y]
+  (Math/abs (- x y)))
+
+(defn close-enough? [x y]
+  (< (diff x y) 0.001))
+
+(defn half-interval-method [f a b]
+  (let [a-value (f a)
+        b-value (f b)]
+    (cond (and (neg? a-value) (pos? b-value)) (search f a b)
+          (and (neg? b-value) (pos? a-value)) (search f b a)
+          :else (throw (Exception. "Values are not of opposite sign")))))
+
+(def ^:dynamic tolerance 0.00001)
+
+(defn fixed-point [f first-guess]
+  (letfn [(close-enough? [v1 v2] (< (diff v1 v2) tolerance))]
+    (loop [guess first-guess]
+      (let [next (f guess)]
+        (if (close-enough? guess next)
+          next
+          (recur next))))))
+
+(defn sqrt [x]
+  (fixed-point (fn [y] (average y (/ x y))) 1.0))
+
+
+;; Exercise 1.35
+;; =============
+
+; 1 + 1/phi = (phi + 1) / phi =
+; (3 + sqrt(5)) / (1 + sqrt(5)) =
+; (3 - 3sqrt(5) + sqrt(5) - 5) / (1 - 5) =
+; (-2 -2sqrt(5)) / -4 =
+; (1 + sqrt(5)) / 2 = phi
+; so it is a fixed point
+
+(defn phi []
+  (fixed-point #(+ 1 (/ 1 %)) 1.0))
+
+
+;; Exercise 1.36
+;; =============
+
+(comment
+  (defn fixed-point [f first-guess]
+    (letfn [(close-enough? [v1 v2] (< (diff v1 v2) tolerance))]
+      (loop [guess first-guess]
+        (let [next (f guess)]
+          (println (str "Guess " guess ", next guess " next))
+          (if (close-enough? guess next)
+            next
+            (recur next))))))
+
+  (fixed-point #(/ (Math/log 1000) (Math/log %)) 2.0))
+
+
+;; Exercise 1.37
+;; =============
+
+(defn cont-frac [n-fn d-fn k]
+  (->> (range k 0 -1)
+    (map (juxt n-fn d-fn))
+    (reduce (fn [accum [n d]] (/ n (+ d accum))) 0.0)))
+
+; It takes 11 iterations:
+;
+; user=> (/ 1 (/ (inc (Math/sqrt 5)) 2))
+; 0.6180339887498948
+; user=> (cont-frac (fn [_] 1) (fn [_] 1) 11)
+; 0.6180555555555556
+
+
+;; Exercise 1.38
+;; =============
+
+(defn approx-e [k]
+  (+ 2
+     (cont-frac
+       (fn [_] 1)
+       (fn [i] (if (= (rem (dec i) 3) 1)
+                 (* 2 (inc (quot i 3)))
+                 1))
+       k)))
+
+
+;; Exercise 1.39
+;; =============
+
+(defn tan-cf [x k]
+  (cont-frac
+    (fn [i] (case i
+              1 x
+              (square x)))
+    (fn [i] (dec (* 2 i)))
+    k))
