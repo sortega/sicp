@@ -1,6 +1,11 @@
 (ns sicp.chapter1-3
-  (:use [sicp.chapter1-1 :only [average]])
   (:use [sicp.chapter1-2 :only [gcd square prime?]]))
+
+(defn average
+  ([a b] (/ (+ a b) 2))
+  ([a b & others]
+    (/ (+ a b (apply + others))
+       (+ 2 (count others)))))
 
 ;; Exercise 1.29
 ;; =============
@@ -236,3 +241,159 @@
               (square x)))
     (fn [i] (dec (* 2 i)))
     k))
+
+
+;; Some higher-order functions bragging
+;; ====================================
+
+(defn average-damp [f]
+  (fn [x]
+    (average x (f x))))
+
+(defn sqrt [x]
+  (fixed-point (average-damp (fn [y] (/ x y)))
+               1.0))
+
+(defn cube-root [x]
+  (fixed-point (average-damp (fn [y] (/ x (square y))))
+               1.0))
+
+(def dx 0.00001)
+(defn deriv [g]
+  (fn [x]
+    (/ (- (g (+ x dx))
+          (g x))
+       dx)))
+
+(defn newton-transform [g]
+  (let [g-prime (deriv g)]
+    (fn [x]
+      (- x (/ (g x) (g-prime x))))))
+
+(defn newtons-method [g guess]
+  (fixed-point (newton-transform g) guess))
+
+(defn sqrt-newton [x]
+  (newtons-method #(- (square %) x) 1.0))
+
+
+;; Exercise 1.40
+;; =============
+
+(defn cubic [a b c]
+  (fn [x]
+    (+ (* x x x)
+       (* a x x)
+       (* b x)
+       c)))
+
+(defn solve-cubic [a b c]
+  (newtons-method (cubic a b c) 1.0))
+
+
+;; Exercise 1.41
+;; =============
+
+(defn twice [f]
+  (fn [x]
+    (f (f x))))
+
+(((twice (twice twice)) inc) 5)
+; 21
+
+
+;; Exercise 1.42
+;; =============
+
+(defn compose [f g]
+  (fn [x]
+    (f (g x))))
+
+
+;; Exercise 1.43
+;; =============
+
+(defn repeated [f n]
+  (loop [g f
+         n n]
+    (if (= n 1)
+      g
+      (recur (compose f g) (dec n)))))
+
+; or using clojure.core:
+(comment
+  (defn repeated [f n]
+    (reduce
+      comp
+      (repeat n f))))
+
+
+;; Exercise 1.44
+;; =============
+
+(defn smooth [f]
+  (fn [x]
+    (average (f (- x dx))
+             (f x)
+             (f (+ x dx)))))
+
+(defn n-smooth [f n]
+  ((repeated smooth n) f))
+
+
+;; Exercise 1.45
+;; =============
+
+(defn nth-root [x n dampings]
+  (letfn [(f [y] (/ x (apply * (repeat (dec n) y))))]
+    (fixed-point
+      ((repeated average-damp dampings) f)
+      1.0)))
+
+;  n dampings
+;  ----------
+;  1 1
+;  2 1
+;  3 1
+;  4 2
+;  5 2
+;  6 2
+;  7 2
+;  8 3
+;  9 3
+; 10 3
+; 11 3
+; 12 3
+; 13 3
+; 14 3
+; 15 3
+; 16 4
+
+(defn nth-root [x n]
+  (let [f        (fn [y] (/ x (apply * (repeat (dec n) y))))
+        dampings (int (/ (Math/log n) (Math/log 2)))]
+    (fixed-point
+      ((repeated average-damp dampings) f)
+      1.0)))
+
+
+;; Exercise 1.46
+;; =============
+
+(defn iterative-improve [good-enough? improve]
+  (fn [first-guess]
+    (loop [guess first-guess]
+      (let [next (improve guess)]
+        (if (good-enough? guess next)
+          next
+          (recur next))))))
+
+(defn fixed-point [f first-guess]
+  (letfn [(close-enough? [v1 v2] (< (diff v1 v2) tolerance))
+          (improve [x] (f x))]
+    ((iterative-improve close-enough? improve) first-guess)))
+
+(defn sqrt [x]
+  (letfn [(close-enough? [v1 v2] (< (diff v1 v2) tolerance))
+          (improve [x] (f x))]
+    ((iterative-improve close-enough? improve) first-guess)))
