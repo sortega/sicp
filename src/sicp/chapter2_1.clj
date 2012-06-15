@@ -305,3 +305,30 @@
     (make-interval (- c factor) (+ c factor))))
 (defn percent [i]
   (* (/ (width i) (abs (center i))) 100))
+
+
+;; Exercise 2.13
+;; =============
+
+; Let [c1 - r1, c1 + r1] an interval with center c1 and percent p1 = r1/c1.
+; If we multiply two intervals:
+;
+; [c1 - r1, c1 + r1] * [c2 - r2, c2 + r2] = [c - r, c + r]
+; c = c1c2 + r1r2
+; r = c1r2 + c2r1
+; p = (c1r2 + c2r1) / (c1c2 + r1r2)
+;
+; p can be approximated as p1 + p2 if r1 << c1 and r2 << c2 since
+; p1 + p2 = (c1r2 + c2r1) / c1c2
+; is almost p when r1r2 << c1c2
+;
+; The complaints to Alyssa's can be related with the error range.  Despite both
+; programs are equivalent, x and 1/x has very different error ranges that get
+; multiplied to each other.
+
+
+;; Exercise 2.14, 2.15, 2.16
+;; =========================
+
+; ...
+
