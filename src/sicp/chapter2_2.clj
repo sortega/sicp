@@ -228,3 +228,15 @@
        tree))
 
 (def square-tree (partial tree-map square))
+
+
+;; Exercise 2.32
+;; =============
+
+(defn subsets [s]
+  (if (empty? s)
+    '(())
+    (let [elem (first s)
+          subs (subsets (rest s))]
+      (concat subs
+              (map #(cons elem %) subs)))))
