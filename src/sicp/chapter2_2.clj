@@ -1,5 +1,6 @@
 (ns sicp.chapter2-2
-  (:use [sicp.chapter1-2 :only [square]]))
+  (:use [sicp.chapter1-2 :only [abs prime? square]])
+  (:use [useful.seq :only [foldr]]))
 
 ;; Exercise 2.17
 ;; =============
@@ -240,3 +241,155 @@
           subs (subsets (rest s))]
       (concat subs
               (map #(cons elem %) subs)))))
+
+
+;; Exercise 2.33
+;; =============
+
+(defn sicp-map [p aseq]
+  (reduce (fn [x y] (cons y x)) nil (reverse aseq)))
+
+(defn append [seq1 seq2]
+  (reduce (fn [x y] (cons y x)) seq2 (reverse seq1)))
+
+(defn length [aseq]
+  (reduce (fn [l _] (inc l)) 0 aseq))
+
+
+;; Exercise 2.34
+;; =============
+
+(defn horner-eval [x coefficient-sequence]
+  (reduce (fn [higher-terms this-coeff]
+            (+ this-coeff
+               (* higher-terms x)))
+          0
+          (reverse coefficient-sequence)))
+
+
+;; Exercise 2.35
+;; =============
+
+(defn count-leaves [x]
+  (if (sequential? x)
+    (reduce + (map count-leaves x))
+    1))
+
+
+;; Exercise 2.36
+;; =============
+
+(defn reduce-n [op init seqs]
+  (when-not (empty? (first seqs))
+    (cons (reduce   op init (map first seqs))
+          (reduce-n op init (map rest seqs)))))
+
+
+;; Exercise 2.37
+;; =============
+
+(defn dot-product [v w]
+  (reduce + (map * v w)))
+
+(defn matrix-*-vector [m v]
+  (map (partial dot-product v) m))
+
+(defn transpose [m]
+  (apply map vector m))
+
+(defn matrix-*-matrix [m n]
+  (map (partial matrix-*-vector m) n))
+
+
+;; Exercise 2.38
+;; =============
+
+; (fold-right / 1 (list 1 2 3)) => 3/2
+; (fold-left / 1 (list 1 2 3))  => 1/6
+; (fold-right list nil (list 1 2 3)) => (1 (2 (3)))
+; (fold-left list nil (list 1 2 3))  => (((1) 2) 3)
+;
+; To get the same result, operator should be associative as the + or *
+; ones.
+
+
+;; Exercise 2.39
+;; =============
+
+(defn reverse-r [aseq]
+  (foldr (fn [elem accum] (concat accum [elem]))
+         ()
+         aseq))
+
+(defn reverse-l [aseq]
+  (reduce #(cons %2 %)
+          ()
+          aseq))
+
+
+;; Exercise 2.40
+;; =============
+
+(defn unique-pairs [n]
+  (when (> n 1)
+    (concat (unique-pairs (dec n))
+            (map (fn [j] [n j]) (range 1 n)))))
+
+(defn prime-sum-pairs [n]
+  (->> (unique-pairs n)
+    (filter (fn [[j i]] (prime? (+ j i))))
+    (map (fn [[j i]] [j i (+ j i)]))))
+
+
+;; Exercise 2.41
+;; =============
+
+; List compehensions rulez!
+
+(defn sum-triples [n s]
+  (for [i (range 1 (inc n))
+        j (range 1 i)
+        k (range 1 j)
+        :when (= s (+ i j k))]
+    [k j i]))
+
+
+;; Exercise 2.42
+;; =============
+
+(def empty-board [])
+
+(defn safe? [k board]
+  (let [positions (map vector (range k) board)
+        k-row     (nth board k)]
+    (letfn [(same-row? [[_ row]]
+              (= row (nth board k)))
+            (same-diag? [[col row]]
+              (= (abs (- col k))
+                 (abs (- row k-row))))]
+      (and
+        (not-any? same-row?  positions)
+        (not-any? same-diag? positions)))))
+
+(defn adjoin-position [row col board]
+  (assoc board col row))
+
+(defn queens [board-size]
+  (letfn [(queen-cols [k]
+            (if (zero? k)
+              [empty-board]
+              (->> (queen-cols (dec k))
+                (mapcat (fn [rest-of-queens]
+                          (map (fn [new-row]
+                                 (adjoin-position new-row (dec k) rest-of-queens))
+                               (range board-size))))
+                (filter (partial safe? (dec k))))))]
+    (queen-cols board-size)))
+
+
+;; Exercise 2.43
+;; =============
+
+; The interchange is fatal since for the evaluation of (queen-cols [k]) the
+; number of recursive calls is the side of the board so time is exponential.
+; (So O(T^n) ?)
