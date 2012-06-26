@@ -1,6 +1,7 @@
 (ns sicp.chapter2-2
   (:use [sicp.chapter1-2 :only [abs prime? square]])
-  (:use [useful.seq :only [foldr]]))
+  (:use [useful.seq :only [foldr]])
+  (:use [quil.core :exclude [abs]]))
 
 ;; Exercise 2.17
 ;; =============
@@ -393,3 +394,324 @@
 ; The interchange is fatal since for the evaluation of (queen-cols [k]) the
 ; number of recursive calls is the side of the board so time is exponential.
 ; (So O(T^n) ?)
+
+
+;; Support methods
+;; ===============
+
+(declare beside below flip-horiz flip-vert up-split)
+
+(defn flipped-pairs [painter]
+  (let [painter2 (beside painter (flip-vert painter))]
+    (below painter2 painter2)))
+
+(defn right-split [painter n]
+  (if (zero? n)
+    painter
+    (let [smaller (right-split painter (dec n))]
+      (beside painter (below smaller smaller)))))
+
+(defn corner-split [painter n]
+  (if (zero? n)
+    painter
+    (let [up           (up-split     painter (dec n))
+          right        (right-split  painter (dec n))
+          top-left     (beside up up)
+          bottom-right (below right right)
+          corner       (corner-split painter (dec n))]
+        (beside (below painter top-left)
+                (below bottom-right corner)))))
+
+(defn square-limit [painter n]
+  (let [quarter (corner-split painter n)
+        half (beside (flip-horiz quarter) quarter)]
+    (below (flip-vert half) half)))
+
+
+;; Exercise 2.44
+;; =============
+
+(defn up-split [painter n]
+  (if (zero? n)
+    painter
+    (let [smaller (up-split painter (dec n))]
+      (beside painter (beside smaller smaller)))))
+
+
+;; HOF samples
+;; ===========
+
+(defn square-of-four [tl tr bl br]
+  (fn [painter]
+    (let [top (beside (tl painter) (tr painter))
+          bottom (beside (bl painter) (br painter))]
+      (below bottom top))))
+
+(defn flipped-pairs [painter]
+  (let [combine4 (square-of-four identity flip-vert
+                                 identity flip-vert)]
+    (combine4 painter)))
+
+(defn square-limit [painter n]
+  (let [combine4 (square-of-four flip-horiz identity
+                                 identity   flip-vert)]
+    (combine4 (corner-split painter n))))
+
+
+;; Exercise 2.45
+;; =============
+
+(defn split [outer-comb inner-comb]
+  (fn split-fn [painter n]
+    (if (zero? n)
+      painter
+      (let [smaller (split-fn painter (dec n))]
+        (outer-comb painter (inner-comb smaller smaller))))))
+
+(def right-split (split beside below))
+(def up-split    (split below beside))
+
+;;
+
+(declare add-vect
+         edge1-frame
+         edge2-frame
+         make-vect
+         origin-frame
+         scale-vect 
+         xcor-vect 
+         ycor-vect)
+
+(defn frame-coord-map [frame]
+  (fn [v]
+    (add-vect
+      (origin-frame frame)
+      (add-vect (scale-vect (xcor-vect v)
+                            (edge1-frame frame))
+                (scale-vect (ycor-vect v)
+                            (edge2-frame frame))))))
+
+
+;; Exercise 2.46
+;; =============
+
+(defn make-vect [x y]
+  {:x x
+   :y y})
+(defn make-vects [& coords]
+  (map #(apply make-vect %) (partition 2 coords)))
+(def xcor-vect :x)
+(def ycor-vect :y)
+
+(defn add-vect [v w]
+  (make-vect
+    (+ (xcor-vect v) (xcor-vect w))
+    (+ (ycor-vect v) (ycor-vect w))))
+
+(defn sub-vect [v w]
+  (make-vect
+    (- (xcor-vect v) (xcor-vect w))
+    (- (ycor-vect v) (ycor-vect w))))
+
+(defn scale-vect [k v]
+  (make-vect
+    (* k (xcor-vect v))
+    (* k (ycor-vect v))))
+
+
+;; Exercise 2.47
+;; =============
+
+(defn make-frame [origin edge1 edge2]
+  (list origin edge1 edge2))
+
+(def origin-frame first)
+(def edge1-frame second)
+(defn edge2-frame [[_ _ third]] third)
+
+;; Painters
+;; ========
+
+(declare start-segment end-segment)
+
+(defn segments->painter [segment-list]
+  (fn [frame]
+    (let [cmap (frame-coord-map frame)]
+      (stroke 0)
+      (stroke-weight 1)
+      (doseq [segment segment-list]
+        (let [start (cmap (start-segment segment))
+              end   (cmap (end-segment segment))]
+          (line (xcor-vect start)
+                (ycor-vect start)
+                (xcor-vect end)
+                (ycor-vect end)))))))
+
+
+;; Exercise 2.48
+;; =============
+
+(defn make-segment [start end]
+  {:start start
+   :end end})
+(def start-segment :start)
+(def end-segment :end)
+
+
+;; Exercise 2.49
+;; =============
+
+(defn make-polyline [points]
+  (map #(apply make-segment %)
+       (partition 2 1 points)))
+
+(defn make-polygon [points]
+  (map #(apply make-segment %)
+       (partition 2 1 points points)))
+
+(def outline-frame
+  (segments->painter 
+    (make-polygon (make-vects 0 0, 0 1, 1 1, 1 0))))
+
+(def cross (segments->painter 
+             [(make-segment (make-vect 0 0) (make-vect 1 1))
+              (make-segment (make-vect 0 1) (make-vect 0 1))]))
+
+(def diamond
+  (segments->painter
+   (make-polygon (make-vects 1 0.5, 0.5 1, 0 0.5, 0.5 0))))
+
+(def wave 
+  (segments->painter
+    (concat
+      (make-polygon (make-vects 4/8 0, 5/8 1/8, 4/8 3/8, 3/8 1/8))    ; head
+      (make-polygon (make-vects 6/8 3/8, 8/8 6/8, 6/8 4/8, 5/8 4/8,   ; arm 1
+                                6/8 8/8, 4/8 6/8, 2/8 8/8,            ; legs
+                                3/8 4/8, 2/8 4/8, 0 2/8, 2/8 3/8))))) ; arm 2
+
+;; Transforming and combining painters
+;; ===================================
+
+(defn transform-painter [painter origin corner1 corner2]
+  (fn [frame]
+    (let [m          (frame-coord-map frame)
+          new-origin (m origin)]
+      (painter
+        (make-frame new-origin
+                    (sub-vect (m corner1) new-origin)
+                    (sub-vect (m corner2) new-origin))))))
+
+(defn flip-vert [painter]
+  (transform-painter painter
+                     (make-vect 0 1)   ; new `origin'
+                     (make-vect 1 1)   ; new end of `edge1'
+                     (make-vect 0 0))) ; new end of `edge2'
+
+(defn shrink-to-upper-right [painter]
+  (transform-painter painter
+                     (make-vect 0.5 0.5)
+                     (make-vect 1.0 0.5)
+                     (make-vect 0.5 1.0)))
+
+(defn rotate90 [painter]
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 0.0)))
+
+(defn beside [painter1 painter2]
+  (let [split-point (make-vect 0.5 0.0)
+        paint-left  (transform-painter painter1
+                                       (make-vect 0.0 0.0)
+                                       split-point
+                                       (make-vect 0.0 1.0))
+        paint-right (transform-painter painter2
+                                       split-point
+                                       (make-vect 1.0 0.0)
+                                       (make-vect 0.5 1.0))]
+      (fn [frame]
+        (paint-left frame)
+        (paint-right frame))))
+
+
+;; Exercise 2.50
+;; =============
+
+(defn flip-horiz [painter]
+  (transform-painter painter
+                     (make-vect 1 0)   ; new `origin'
+                     (make-vect 0 0)   ; new end of `edge1'
+                     (make-vect 1 1))) ; new end of `edge2'
+
+
+;; Exercise 2.51
+;; =============
+
+(defn below [painter1 painter2]
+  (let [split-point  (make-vect 0.0 0.5)
+        paint-top    (transform-painter painter1
+                                        (make-vect 0.0 0.0)
+                                        (make-vect 1.0 0.0)
+                                        split-point)
+        paint-bottom (transform-painter painter2
+                                        split-point
+                                        (make-vect 1.0 0.5)
+                                        (make-vect 0.0 1.0))]
+      (fn [frame]
+        (paint-top frame)
+        (paint-bottom frame))))
+
+
+
+;; Exercise 2.52
+;; =============
+
+; a) Now with an "smile"
+(def wave 
+  (segments->painter
+    (concat
+      (make-polygon  (make-vects 4/8 0, 5/8 1/8, 4/8 3/8, 3/8 1/8))    ; head
+      (make-polyline (make-vects 7/16 3/16, 4/8 2/8, 9/16 3/16))       ; smile
+      (make-polygon  (make-vects 6/8 3/8, 8/8 6/8, 6/8 4/8, 5/8 4/8,   ; arm 1
+                                 6/8 8/8, 4/8 6/8, 2/8 8/8,            ; legs
+                                 3/8 4/8, 2/8 4/8, 0 2/8, 2/8 3/8))))) ; arm 2
+
+; b) One copy of up-split
+(defn corner-split [painter n]
+  (if (zero? n)
+    painter
+    (let [up           (up-split     painter (dec n))
+          right        (right-split  painter (dec n))
+          top-left     (beside up up)
+          bottom-right (below right right)
+          corner       (corner-split painter (dec n))]
+        (beside (below painter top-left)
+                (below bottom-right corner)))))
+
+; c) different arrangement
+(defn square-limit [painter n]
+  (let [quarter (corner-split painter n)
+        half (beside quarter (flip-horiz quarter))]
+    (below (flip-vert half) half)))
+
+
+;; GUI scafolding
+;; ==============
+
+(def painter (atom wave))
+
+(defn paint []
+  (quil.applet/applet
+    :title "SICP painter output"
+    :setup (fn []
+             (smooth)
+             (frame-rate 10))
+    :draw  (fn []
+             (background 200)
+             (@painter (make-frame (make-vect 0 0)
+                                   (make-vect (width) 0)
+                                   (make-vect 0 (height)))))
+    :size [323 200]))
+
+(defn set-painter [paint]
+  (reset! painter paint))
