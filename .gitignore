@@ -1,10 +1,11 @@
-/target
-/lib
-/classes
-/checkouts
-pom.xml
-*.jar
 *.class
+*.jar
 .lein-deps-sum
 .lein-failures
 .lein-plugins
+/checkouts
+/classes
+/lib
+/native
+/target
+pom.xml
