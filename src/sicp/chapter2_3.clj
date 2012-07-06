@@ -1,4 +1,5 @@
 (ns sicp.chapter2-3
+  (:use [clojure.set :as s])
   (:use [sicp.chapter1-2 :only [abs]]))
 
 (defn memq [item x]
@@ -447,7 +448,9 @@
                 (< el1 el2) (recur rest1 list2 intersection)
                 :else       (recur list1 rest2 intersection)))))))
 
-;; ---
+
+;; Exercise 2.66
+;; =============
 
 (declare get-key)
 
@@ -457,10 +460,6 @@
       elem
       (recur given-key (rest set-of-records)))))
 
-
-;; Exercise 2.66
-;; =============
-
 (defn lookup [given-key set-of-records]
   (when-not (empty? set-of-records)
     (let [element (entry set-of-records)
@@ -469,3 +468,175 @@
             (< k given-key) (recur given-key (left-branch set-of-records))
             :else           (recur given-key (right-branch set-of-records))))))
 
+
+;; Huffman trees using multimethods
+;; ================================
+
+(defmulti symbols :type)
+(defmulti weight :type)
+
+; Leaves
+
+(defn make-leaf [sym weight]
+  {:type   :leaf
+   :symbol sym
+   :weight weight})
+
+(defn leaf? [object]
+  (= (:type object) :leaf))
+
+(def symbol-leaf :symbol)
+(def weight-leaf :weight)
+
+(defmethod symbols :leaf [x]
+  (sorted-set (:symbol x)))
+
+(defmethod weight :leaf [x]
+  (:weight x))
+
+; Branches
+
+(defn make-code-tree [left right]
+  {:type :branch
+   :left left
+   :right right})
+
+(def left-branch :left)
+(def right-branch :right)
+
+(defmethod symbols :branch [{:keys [left right]}]
+  (s/union (symbols left)
+           (symbols right)))
+
+(defmethod weight :branch [{:keys [left right]}]
+  (+ (weight left) (weight right)))
+
+; Decoding
+
+(defn choose-branch [bit branch]
+  (case bit
+    0 (left-branch branch)
+    1 (right-branch branch)
+    (throw (Exception. (str "bad bit -- CHOOSE-BRANCH --" bit)))))
+
+(defn decode [bits tree]
+  (letfn [(decode-1 [bits current-branch]
+            (if (empty? bits)
+              ()
+              (let [next-branch (choose-branch (first bits) current-branch)]
+                (if (leaf? next-branch)
+                  (cons (symbol-leaf next-branch)
+                        (decode-1 (rest bits) tree))
+                  (recur (rest bits) next-branch)))))]
+    (decode-1 bits tree)))
+
+(comment
+  (defn adjoin-set [x set]
+    (cond (empty? set) [x]
+          (< (weight x) (weight (first set))) (cons x set)
+          :else (cons (first set)
+                      (adjoin-set x (rest set)))))
+
+  (defn make-leaf-set [pairs]
+    (if (empty? pairs)
+      '()
+      (let [pair (first pairs)]
+        (adjoin-set (make-leaf (first pair)    ; symbol
+                               (second pair))  ; frequency
+                    (make-leaf-set (rest pairs))))))
+)
+
+(defn make-leaf-set [pairs]
+  (map
+    #(apply make-leaf %)
+    (sort-by second pairs)))
+
+
+;; Exercise 2.67
+;; =============
+
+(def sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree
+                    (make-leaf 'B 2)
+                    (make-code-tree (make-leaf 'D 1)
+                                    (make-leaf 'C 1)))))
+
+(def sample-message [0 1 1 0 0 1 0 1 0 1 1 1 0])
+
+; sicp.chapter2-3=> (decode sample-message sample-tree)
+; (A D A B B C A)
+
+
+;; Exercise 2.68
+;; =============
+
+(defn encode-symbol [sym tree]
+  (loop [branch tree
+         code   []]
+    (let [left  (left-branch branch)
+          right (right-branch branch)]
+      (cond (and (contains? (symbols branch) sym) (leaf? branch)) code
+            (contains? (symbols left) sym)        (recur left (conj code 0))
+            (contains? (symbols right) sym)       (recur right (conj code 1))
+            :else nil))))
+
+(defn encode [message tree]
+  (mapcat #(encode-symbol % tree)
+          message))
+
+
+;; Exercise 2.69
+;; =============
+
+(defn merge-lightest-trees [sorted-trees]
+  (let [[t1 t2 & ts] sorted-trees
+        merged       (make-code-tree t1 t2)]
+    (sort-by weight
+             (cons merged ts))))
+
+(defn succesive-merge [leaves]
+  (->> (iterate merge-lightest-trees leaves)
+    (drop-while #(> (count %) 1))
+    first
+    first))
+
+(defn generate-huffman-tree [pairs]
+  (succesive-merge (make-leaf-set pairs)))
+
+
+;; Exercise 2.70
+;; =============
+
+(def rock-code (generate-huffman-tree [["A" 2] ["NA" 16] ["BOOM" 1] ["SHA" 3]
+                                       ["GET" 2] ["YIP" 9] ["JOB" 2] ["WAH" 1]]))
+
+(comment
+  (encode ["GET" "A" "JOB"
+           "SHA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA"
+           "GET" "A" "JOB"
+           "SHA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA"
+           "SHA" "BOOM"] rock-code)
+  (1 1 1 1 0 1 1 0 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 1 0 1 1 0 1 1 1 1
+   1 1 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 0 1 1 0 0 0)
+)
+
+; It is encoded in 61 bits with the variable length encoding versus 78 bits of
+; fixed width one (3 bits x 26 characters).
+
+
+;; Exercise 2.71
+;; =============
+
+;; In that case Huffman tree looks like a linked list. The most frequent
+;; symbol is encoded by one digit and the least by n-1.
+
+
+
+;; Exercise 2.72
+;; =============
+
+;; The order of growth depends on the relative symbol frequencies. For the
+;; extreme case of exercise 2.71 that means O(n) recursive calls in which
+;; O(log(n)) set lookups occurs. In the end that means O(n*log(n)) for the
+;; worst case.
