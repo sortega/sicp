@@ -169,64 +169,66 @@
 
 ;; a) infix notation with fully parentherized expressions
 
-(defn operation? [op x]
-  (and (seq? x)
-       (= (second x) op)))
+(comment
+  (defn operation? [op x]
+    (and (seq? x)
+        (= (second x) op)))
 
-(defn make-sum [a1 a2]
-  (cond (=number? a1 0) a2
-        (=number? a2 0) a1
-        (and (number? a1) (number? a2)) (+ a1 a2)
-        :else (list a1 '+ a2)))
-(def sum? (partial operation? '+))
-(def addend first)
-(def augend third)
+  (defn make-sum [a1 a2]
+    (cond (=number? a1 0) a2
+          (=number? a2 0) a1
+          (and (number? a1) (number? a2)) (+ a1 a2)
+          :else (list a1 '+ a2)))
+  (def sum? (partial operation? '+))
+  (def addend first)
+  (def augend third)
 
-(defn make-product [m1 m2]
-  (cond (or (=number? m1 0) (=number? m2 0)) 0
-        (=number? m1 1) m2
-        (=number? m2 1) m1
-        (and (number? m1) (number? m2)) (* m1 m2)
-        :else (list m1 '* m2)))
-(def product? (partial operation? '*))
-(def multiplier first)
-(def multiplicand third)
+  (defn make-product [m1 m2]
+    (cond (or (=number? m1 0) (=number? m2 0)) 0
+          (=number? m1 1) m2
+          (=number? m2 1) m1
+          (and (number? m1) (number? m2)) (* m1 m2)
+          :else (list m1 '* m2)))
+  (def product? (partial operation? '*))
+  (def multiplier first)
+  (def multiplicand third)
+)
 
 ;; b) infix notation with standard algebraic notation
+(comment
+  (def precedence {'* 0
+                  '+ 1})
 
-(def precedence {'* 0
-                 '+ 1})
+  (defn operators [x]
+    (map second (partition 2 x)))
 
-(defn operators [x]
-  (map second (partition 2 x)))
-
-(defn operation [x]
-  (apply max-key precedence (operators x)))
+  (defn operation [x]
+    (apply max-key precedence (operators x)))
 
 
-(defn operation? [op x]
-  (and (seq? x)
-       (= (operation x) op)))
-(def sum? (partial operation? '+))
-(def product? (partial operation? '*))
+  (defn operation? [op x]
+    (and (seq? x)
+        (= (operation x) op)))
+  (def sum? (partial operation? '+))
+  (def product? (partial operation? '*))
 
-(defn first-operand [operator x]
-  (let [op1 (take-while #(not= operator %) x)]
-    (if (> (count op1) 1)
-      op1
-      (first op1))))
+  (defn first-operand [operator x]
+    (let [op1 (take-while #(not= operator %) x)]
+      (if (> (count op1) 1)
+        op1
+        (first op1))))
 
-(defn second-operand [operator x]
-  (let [op2 (rest (drop-while #(not= operator %) x))]
-    (if (> (count op2) 1)
-      op2
-      (first op2))))
+  (defn second-operand [operator x]
+    (let [op2 (rest (drop-while #(not= operator %) x))]
+      (if (> (count op2) 1)
+        op2
+        (first op2))))
 
-(def addend (partial first-operand '+))
-(def augend (partial second-operand '+))
-(def multiplier (partial first-operand '*))
-(def multiplicand (partial second-operand '*))
-
+  (def addend (partial first-operand '+))
+  (def augend (partial second-operand '+))
+  (def multiplier (partial first-operand '*))
+  (def multiplicand (partial second-operand '*))
+)
 
 ;; Unordered lists as sets
 ;; =======================
